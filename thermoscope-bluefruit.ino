@@ -55,6 +55,7 @@ void error(const __FlashStringHelper*err) {
 int32_t tsServiceIdA;
 int32_t tsMeasureCharIdA;
 
+uint32_t disconnectedCount;
 
 void setup(void) {
   // Not sure if this is needed or not
@@ -133,11 +134,36 @@ void setup(void) {
 
   Serial.println();
 
+  disconnectedCount = 0;
 }
  
 void loop(void) {
   uint8_t i;
   float average;
+
+  if(!ble.isConnected()){
+    disconnectedCount += 1;
+    Serial.print("No connection. Count: ");
+    Serial.println(disconnectedCount);
+    if(disconnectedCount > 60){
+      // Serial.println("No connection before timeout, should shutdown here");
+
+      // Seems the best option I can find is using rtc standby:
+      // https://github.com/cavemoa/Feather-M0-Adalogger/blob/master/SimpleSleepUSB/SimpleSleepUSB.ino
+      // send it to sleep so the reset button will wake it up
+      // However it might be fine to not sleep and just check for a connection ever so often.
+      // It depends on how power hungry the dely is 
+      // set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+      // sleep_enable();
+      // sleep_mode();
+    }
+    delay(1000);
+    // do not do any analog collection until we are connected
+    return;
+  }
+
+  // if we are here then we are connected
+  disconnectedCount = 0;
  
   // take N samples in a row, with a slight delay
   for (i=0; i< NUMSAMPLES; i++) {
