@@ -15,6 +15,7 @@ The bluetooth code was copied from their healththermometer example.
 #include "Adafruit_BluefruitLE_SPI.h"
 #include "Adafruit_BluefruitLE_UART.h"
 #include "Adafruit_BLEGatt.h"
+#include "Adafruit_BLEBattery.h"
 
 #include "BluefruitConfig.h"
 
@@ -31,7 +32,10 @@ The bluetooth code was copied from their healththermometer example.
 #define BCOEFFICIENT 3950
 // the value of the 'other' resistor
 #define SERIESRESISTOR 10000    
- 
+
+// Battery pin
+#define VBATPIN A7
+      
 int samples[NUMSAMPLES];
 
 /* Create the bluefruit object, if you want to use this sketch with a different bluefruit
@@ -43,6 +47,9 @@ Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_
 
 // Setup the gatt object
 Adafruit_BLEGatt gatt(ble);
+
+// Setup battery object
+Adafruit_BLEBattery battery(ble);
 
 // A small helper
 void error(const __FlashStringHelper*err) {
@@ -128,6 +135,9 @@ void setup(void) {
   // Switch to 12 bit resolution
   analogReadResolution(12);
 
+  // Enable Battery service do not reset, we'll do that ourselves
+  battery.begin(false);
+  
   /* Reset the device for the new service setting changes to take effect */
   Serial.print(F("Performing a SW reset (service changes require a reset): "));
   ble.reset();
@@ -157,7 +167,7 @@ void loop(void) {
       // sleep_enable();
       // sleep_mode();
     }
-    delay(1000);
+    delay(2000);
     // do not do any analog collection until we are connected
     return;
   }
@@ -165,6 +175,21 @@ void loop(void) {
   // if we are here then we are connected
   disconnectedCount = 0;
  
+  // Update battery reading
+  float measuredvbat = analogRead(VBATPIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 4096; // convert to voltage in 12bit mode
+  // the voltage should range between 3 and 4.2 (but might go higher)
+  uint8_t percentage = (uint8_t)((measuredvbat - 3.0) / 1.25 * 100);
+  
+  Serial.print("Update battery level voltage: ");
+  Serial.print(measuredvbat);
+  Serial.print(" percent: ");
+  Serial.println(percentage);  
+  battery.update(percentage);
+
+  
   // take N samples in a row, with a slight delay
   for (i=0; i< NUMSAMPLES; i++) {
    samples[i] = analogRead(THERMISTORPIN);
