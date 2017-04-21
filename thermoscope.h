@@ -26,6 +26,8 @@ typedef struct SensorServiceInfo {
   int32_t thermistorBetaCharId;
 } SensorServiceInfo;
 
+typedef void (*GattCallback) (int32_t, uint8_t[], uint16_t);
+
 // Need prototypes here because arduino is automatically adding these to the top of the file which is before the structs
 // are defined
 void readTemperature(SensorServiceInfo *sensorService, const __FlashStringHelper*label, int32_t pin, TempCoefficients *coefficients);
