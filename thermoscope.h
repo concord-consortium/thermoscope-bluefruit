@@ -20,7 +20,7 @@ typedef struct ATTR_PACKED UserConfigV1 {
 typedef struct SensorServiceInfo {
   int32_t serviceId;
   int32_t measureCharId;  
-  int32_t voltsCharId;
+  int32_t microVoltsCharId;
   int32_t seriesResistanceCharId;
   int32_t thermistorNominalResistanceCharId;
   int32_t thermistorBetaCharId;
