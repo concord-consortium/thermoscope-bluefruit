@@ -64,7 +64,7 @@ void error(const __FlashStringHelper*err) {
 
 
 /* The service information */
-int32_t idStringCharId;
+int32_t iconCharCharacteristicId;
 
 SensorServiceInfo sensorServiceA;
 SensorServiceInfo sensorServiceB;
@@ -74,7 +74,7 @@ uint32_t disconnectedCount;
 // This initialized the struct so the first time it is written the defaults
 // get written too
 static UserConfigV1 userConfigV1 = {
-  {0}, // zero idString
+  {0}, // nul iconChar
   {
     10000, // seriesResistance
     10000, // thermistorNominalResistance
@@ -124,25 +124,29 @@ void BleGattRXId(int32_t chars_id, uint8_t data[], uint16_t len)
   Serial.print(F(", len: "));
   Serial.print(len);
   Serial.print(F(" "));
-
-  if (chars_id == idStringCharId)
-  {
+  
+  if (chars_id == iconCharCharacteristicId)
+  {   
     Serial.write(data, len);
     Serial.println();
     // save this into NVM
 
     // the incoming data buffer is not null terminated.
     // set the string to be all 0s before copying in new characters
-    memset(userConfigV1.idString, 0, ID_STRING_LEN);
+    memset(userConfigV1.iconChar, 0, ICON_CHAR_LEN);
 
-    // leave at least one blank byte at the end of the idString this way at least
+    // leave at least one blank byte at the end of the iconChar this way at least
     // one of the 0s that we added before will be at the end of the string.
-    // this way it should guaruntee the string is NULL terminated
-    strncpy(userConfigV1.idString, (char *)data, min(len,(ID_STRING_LEN - 1)));
+    // this way it should guaruntee the string is NUL terminated
+    strncpy(userConfigV1.iconChar, (char *)data, min(len,(ICON_CHAR_LEN - 1)));
     updateNVM();
 
     // it would be good to also change the name of the device here
     // but in the meantime the user can just reset after doing this
+    setDeviceName(userConfigV1.iconChar);
+
+    // reset the device after setting its name
+    ble.reset();
   }
 }
 
@@ -175,11 +179,6 @@ void BleGattRXSensorA(int32_t chars_id, uint8_t data[], uint16_t len)
 void BleGattRXSensorB(int32_t chars_id, uint8_t data[], uint16_t len)
 {
   BleGattRXSensor(&sensorServiceB, &userConfigV1.sensorB, chars_id, data, len);
-}
-
-
-size_t idLength() {
-  return strnlen(userConfigV1.idString, 4);
 }
 
 int32_t addIntegerOutputCharacteristic(uint16_t uuid) {
@@ -260,11 +259,43 @@ void addSensorService(uint8_t serviceUUID[], SensorServiceInfo *info, TempCoeffi
     addCoefficientCharacteristic(0x0005, coefficients->thermistorBeta, gattCallback);
 }
 
+void setDeviceName(char *iconChar) {
+  // leave room for a [space] + 4 byte char + nul
+  char device_name[17];
+  strcpy_P(device_name, PSTR("Thermoscope"));
+
+  if (strlen(iconChar) > 0) {
+    // make sure we don't overflow the buffer incase the string is not null terminated
+    size_t _iconCharLength = strnlen(iconChar, 4);
+    
+    Serial.print( F("Length of id char: "));
+    Serial.println(_iconCharLength);
+    Serial.println(iconChar);
+    if(_iconCharLength > 0){
+      strcat_P(device_name, PSTR(" "));
+      // we've made sure iconCharLength is not greater than 4 so this way we shouldn't overflow
+      // the device_name buffer
+      strncat(device_name, iconChar, _iconCharLength);
+    }
+  }
+
+  /* Change the device name to make it easier to find */
+  Serial.print(F("Setting device name to '"));
+  Serial.print(device_name);
+  Serial.print(F("': "));
+
+  if (! ble.atcommand(F("AT+GAPDEVNAME"), device_name)) {
+    error(F("Could not set device name?"));
+  }
+
+}
+
 void setup(void) {
   // Not sure if this is needed or not
   delay(500);
 
   Serial.begin(115200);
+  // delay(2000); // 2 second delay is required inorder to see these first lines in the output
   // would be good to have a version string here that was also published through gatt
   Serial.println(F("Bluefruit Thermoscope"));
   Serial.println(F("--------------------------------------------"));
@@ -308,24 +339,11 @@ void setup(void) {
   /* Print Bluefruit information */
   ble.info();
 
-  // leave space for 1 space, an 4 byte char, and null
-  char device_name[17];
-  strcpy_P(device_name, PSTR("Thermoscope"));
-
   int32_t magic_number;
-  bool has_identifier = false;
-  // I believe 4 bytes plus a nul char is enough to hold all utf8 chars.
-  char identifier[5];
   ble.readNVM(0, &magic_number);
-
 
   if ( magic_number != MAGIC_NUMBER )
   {
-    // We have been having an issues with thermoscopes losing their name
-    // If the readNVM call above didn't work, then we do a reset. Perhaps
-    // sometimes the readNVM fails even though the data is still there
-    // so it might be good to look at the return value of readNVM and try again
-
     /* Perform a factory reset to make sure everything is in a known state */
     Serial.println(F("Magic not found: performing a factory reset: "));
     if ( ! ble.factoryReset() ){
@@ -348,29 +366,9 @@ void setup(void) {
     Serial.println(nvmVersion);
 
     ble.readNVM(8, (uint8_t *)&userConfigV1, sizeof(UserConfigV1));
-
-    size_t _idLength = idLength();
-    Serial.print( F("Length of id char: "));
-    Serial.println(_idLength);
-    Serial.println(userConfigV1.idString);
-    // make sure we don't override the buffer incase the string is not null terminated
-    if(_idLength > 0){
-      strcat_P(device_name, PSTR(" "));
-      // we've made sure idLength is not greater than 4 so this way we shouldn't override
-      // the device_name buffer
-      strncat(device_name, userConfigV1.idString, _idLength);
-    }
   }
 
-
-  /* Change the device name to make it easier to find */
-  Serial.print(F("Setting device name to '"));
-  Serial.print(device_name);
-  Serial.print(F("': "));
-
-  if (! ble.atcommand(F("AT+GAPDEVNAME"), device_name)) {
-    error(F("Could not set device name?"));
-  }
+  setDeviceName(userConfigV1.iconChar);
 
   // clear all services and characteristics
   // I can't tell if the values of characteristics is saved in NVM, if it was we could improve this
@@ -380,22 +378,22 @@ void setup(void) {
 
   // add generic thermoscope service
   // add writable characteristic for the identifier
-  // TODOL add readable characteristic with a version
+  // TODO add readable characteristic with a version
   gatt.addService(0x1234);
 
   // The AT command has the ability to set a default value but this helper function doesn't
-  idStringCharId = gatt.addCharacteristic(0x2345, GATT_CHARS_PROPERTIES_WRITE | GATT_CHARS_PROPERTIES_READ,
+  iconCharCharacteristicId = gatt.addCharacteristic(0x2345, GATT_CHARS_PROPERTIES_WRITE | GATT_CHARS_PROPERTIES_READ, 
     1, 5, BLE_DATATYPE_STRING, "identifier char");
 
-  // set the default value of the idString
-  // this assuming the string is always null terminated. That should be the case if the userConfig
+  // set the default value of the iconChar
+  // this assumes the string is always null terminated. That should be the case if the userConfig
   // was initialized correctly.
-  // Note: the idString is a char[].  If a its type was a uint8_t[] then the setChar method trys to do
-  // a conversion so if the idString was intended to be 'h', the actual value saved would be '68'
-  gatt.setChar(idStringCharId, userConfigV1.idString);
+  // Note: the iconChar is a char[].  If a its type was a uint8_t[] then the setChar method trys to do
+  // a conversion so if the iconChar was intended to be 'h', the actual value saved would be '68'
+  gatt.setChar(iconCharCharacteristicId, userConfigV1.iconChar);
 
   // add a callback so we get notified when this changes
-  addGattRxCallback(idStringCharId, BleGattRXId);
+  addGattRxCallback(iconCharCharacteristicId, BleGattRXId);
 
   // TODO: Using the autogenerated one below didn't work for some reason???
   // {0xbc, 0x44, 0x00, 0x00, 0xf2, 0x44, 0x4f, 0x49, 0xb6, 0x56, 0xdf, 0x49, 0x85, 0x77, 0x55, 0xe4 };
