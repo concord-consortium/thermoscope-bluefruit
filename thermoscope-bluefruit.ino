@@ -326,6 +326,12 @@ void setup(void) {
 //  ble.atcommand(F("AT+DBGNVMRD"));
   uint8_t data[256];
   // there is a max size of 64 bytes when reading like this
+  // We are having an issue where the NVM data is cleared, it is not clear why yet.
+  // One time while testing I saw this return all 0s, when it should have had data.
+  // So it implies something is reseting it.
+  // One fix would be to have a special sketch that initializes it, and then never reset it.
+  // if the magic number doesn't match then the main sketch would just stop and flash the led.
+  // this might help us narrow down the problem.
   ble.readNVM(0, data, 32);
   Serial.println("Current NVM");
   for(int i=0; i<16; i++){
