@@ -291,11 +291,13 @@ void setDeviceName(char *iconChar) {
 }
 
 void setup(void) {
+  // while (!Serial);  // wait for console do not leave this in production
+
   // Not sure if this is needed or not
   delay(500);
 
   Serial.begin(115200);
-  // delay(2000); // 2 second delay is required inorder to see these first lines in the output
+
   // would be good to have a version string here that was also published through gatt
   Serial.println(F("Bluefruit Thermoscope"));
   Serial.println(F("--------------------------------------------"));
@@ -369,6 +371,18 @@ void setup(void) {
   }
 
   setDeviceName(userConfigV1.iconChar);
+
+  // TODO change the bluetooth level settings
+  // set the power level: AT+BLEPOWERLEVEL
+  if (! ble.atcommand(F("AT+BLEPOWERLEVEL=4"))) {
+    error(F("Could not increase power level"));
+  }
+  
+  // set the intervals: AT+GAPINTERVALS=[min connection int],[max conn int],[fast adv int],[fast adv timeout],[low pwr adv int]
+  if (! ble.atcommand(F("AT+GAPINTERVALS=20,40,20,30,40"))) {
+    error(F("Could not increase power level"));
+  }
+  
 
   // clear all services and characteristics
   // I can't tell if the values of characteristics is saved in NVM, if it was we could improve this
