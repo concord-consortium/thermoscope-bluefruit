@@ -8,9 +8,9 @@ typedef struct ATTR_PACKED TempCoefficients {
 } TempCoefficients;
 
 // This is currently 17 bytes
-#define ID_STRING_LEN 5
+#define ICON_CHAR_LEN 5
 typedef struct ATTR_PACKED UserConfigV1 {
-  char idString[ID_STRING_LEN];
+  char iconChar[ICON_CHAR_LEN];
   TempCoefficients sensorA;
   TempCoefficients sensorB;
 } UserConfigV1;
