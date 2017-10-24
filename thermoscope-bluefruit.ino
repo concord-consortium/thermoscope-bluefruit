@@ -393,20 +393,29 @@ void setup(void) {
 
     // Write data to NVM
     Serial.println( F("Write defined data to NVM") );
-    ble.writeNVM(0, MAGIC_NUMBER);
+    if ( ! ble.writeNVM(0, MAGIC_NUMBER) ) {
+      error(F("Coudn't write magic number"));
+    }
+    
     // Write NVM version
-    ble.writeNVM(4, NVM_VERSION);
+    if ( ! ble.writeNVM(4, NVM_VERSION) ) {
+      error(F("Coudn't write NVM version"));      
+    }
     // write the defaults
     updateNVM();
   }else
   {
     Serial.println(F("Magic found"));
     int32_t nvmVersion;
-    ble.readNVM(4, &nvmVersion);
+    if ( ! ble.readNVM(4, &nvmVersion) ) {
+      error(F("Couldn't read NVM version"));
+    }
     Serial.print( F("NVM Version: ") );
     Serial.println(nvmVersion);
 
-    ble.readNVM(8, (uint8_t *)&userConfigV1, sizeof(UserConfigV1));
+    if ( ! ble.readNVM(8, (uint8_t *)&userConfigV1, sizeof(UserConfigV1)) ) {
+      error(F("Couldn't read device configuration"));
+    }
   }
 
   setDeviceName(userConfigV1.iconChar);
@@ -431,26 +440,40 @@ void setup(void) {
   // add generic thermoscope service
   // add writable characteristic for the identifier
   // TODO add readable characteristic with a version
-  gatt.addService(0x1234);
+  uint8_t genericService = gatt.addService(0x1234);
+  if( genericService == 0 ) {
+    error(F("Couldn't add generic service"));
+  }
 
   // Add icon character characteristic
   // The AT command has the ability to set a default value but this helper function doesn't
   iconCharCharacteristicId = gatt.addCharacteristic(0x2345, GATT_CHARS_PROPERTIES_WRITE | GATT_CHARS_PROPERTIES_READ, 
     1, 5, BLE_DATATYPE_STRING, "identifier char");
+  if( iconCharCharacteristicId == 0 ) {
+    error(F("Couldn't add icon characteristic"));
+  }
+
 
   // set the default value of the iconChar
   // this assumes the string is always null terminated. That should be the case if the userConfig
   // was initialized correctly.
   // Note: the iconChar is a char[].  If a its type was a uint8_t[] then the setChar method trys to do
   // a conversion so if the iconChar was intended to be 'h', the actual value saved would be '68'
-  gatt.setChar(iconCharCharacteristicId, userConfigV1.iconChar);
+  if( ! gatt.setChar(iconCharCharacteristicId, userConfigV1.iconChar) ) {
+    error(F("Couldn't set icon characteristic value"));
+  }
 
   // Add version characteristic
   // The AT command has the ability to set a default value but this helper function doesn't
   versionCharacteristicId = gatt.addCharacteristic(0x6789, GATT_CHARS_PROPERTIES_READ, 
     5, 10, BLE_DATATYPE_STRING, "version");
+  if( versionCharacteristicId == 0 ) {
+    error(F("Couldn't add version characteristic"));
+  }
 
-  gatt.setChar(versionCharacteristicId, "1.0.0");
+  if( !gatt.setChar(versionCharacteristicId, "1.0.0") ){
+    error(F("Couldn't set version characteristic value"));
+  }
   
   // add a callback so we get notified when this changes
   addGattRxCallback(iconCharCharacteristicId, BleGattRXId);
