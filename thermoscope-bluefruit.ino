@@ -62,10 +62,11 @@ Adafruit_BLEBattery battery(ble);
 void error(const __FlashStringHelper*err) {
   Serial.println(err);
   while (1){
-    digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-    delay(50);                       // wait for a 0.1 seconds
-    digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
-    delay(50);                       // wait for a 0.1 seconds
+    // Flicker the LED 50ms on 50ms off
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(50);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(50);
   }
 }
 
