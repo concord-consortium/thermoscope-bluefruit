@@ -19,6 +19,8 @@ The bluetooth code was copied from their healththermometer example.
 
 #include "BluefruitConfig.h"
 
+#define MINIMUM_FIRMWARE_VERSION "0.7.7"
+
 // which analog pin to connect A sensor
 #define THERMISTORPINA A2
 // which analog pin to connect B sensor
@@ -59,12 +61,18 @@ Adafruit_BLEBattery battery(ble);
 // A small helper
 void error(const __FlashStringHelper*err) {
   Serial.println(err);
-  while (1);
+  while (1){
+    digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on (HIGH is the voltage level)
+    delay(50);                       // wait for a 0.1 seconds
+    digitalWrite(LED_BUILTIN, LOW);    // turn the LED off by making the voltage LOW
+    delay(50);                       // wait for a 0.1 seconds
+  }
 }
 
 
 /* The service information */
 int32_t iconCharCharacteristicId;
+int32_t versionCharacteristicId;
 
 SensorServiceInfo sensorServiceA;
 SensorServiceInfo sensorServiceB;
@@ -290,40 +298,8 @@ void setDeviceName(char *iconChar) {
 
 }
 
-void setup(void) {
-  // while (!Serial);  // wait for console do not leave this in production
-
-  // Not sure if this is needed or not
-  delay(500);
-
-  Serial.begin(115200);
-
-  // would be good to have a version string here that was also published through gatt
-  Serial.println(F("Bluefruit Thermoscope"));
-  Serial.println(F("--------------------------------------------"));
-
-  if ( !ble.begin(VERBOSE_MODE) )
-  {
-    error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
-  }
-  Serial.println( F("OK!") );
-
-  /* Perform a factory reset to make sure everything is in a known state */
-  // Disable this so we can use the non-volitale memory
-  //  Serial.println(F("Performing a factory reset: "));
-  //  if (! ble.factoryReset() ){
-  //       error(F("Couldn't factory reset"));
-  //  }
-
-  // ble.writeNVM(offset, str)
-  // need to look at 'strlen' for the length of the string
-  // the read call needs to pass the length of the string but it does do a copy operation that might stop
-  // with the null characters so if the string is variable lenght
-  // then I need to save this length
-  // Need to figure out how to create a characteristic that can written to
-  // We need these for the identifier and the calibration
-
-//  ble.atcommand(F("AT+DBGNVMRD"));
+void printNVM(void) {
+  //  ble.atcommand(F("AT+DBGNVMRD"));
   uint8_t data[256];
   // there is a max size of 64 bytes when reading like this
   // We are having an issue where the NVM data is cleared, it is not clear why yet.
@@ -339,16 +315,72 @@ void setup(void) {
     Serial.print(F(" "));
   }
   Serial.println(F(""));
+}
 
-  /* Disable command echo from Bluefruit */
-  ble.echo(false);
+void setup(void) {
+  // while (!Serial);  // wait for console do not leave this in production
+
+  // initialize digital pin LED_BUILTIN as an output and turn off the light for 0.5 s
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+  digitalWrite(LED_BUILTIN, HIGH);
+
+  Serial.begin(115200);
+
+
+  // Test out the error code
+  // error(F("Testing error led flashing"));
+
+  // would be good to have a version string here that was also published through gatt
+  Serial.println(F("Bluefruit Thermoscope"));
+  Serial.println(F("--------------------------------------------"));
+
+  if ( !ble.begin(VERBOSE_MODE) )
+  {
+    error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
+  }
+  Serial.println( F("OK!") );
+
+  /* Disable command echo from Bluefruit 
+     If this fails then the bluefruit is probably stuck or perhaps it was too slow
+     waking up  
+  */  
+  if( !ble.echo(false) )
+  {
+    // Try to toggle the mode
+    
+    
+    // Try a reset to see if that fixes it
+    if( !ble.reset(true) ) {
+
+      // we could try a hardware based factory reset here, that might cause the loss of more
+      // icons. Hopefully this set of steps will prevent some of the current icon loss
+      error(F("Cannot reset bluefruit. Probably there is something wrong with the board"));
+    }
+
+    if( !ble.echo(false) )
+    {
+      error(F("Cannot disable echo on bluefruit, even after a reset"));
+    }
+  }
+
+  /* This sketch requires firmware 0.7.7 or higher */
+  if ( !ble.isVersionAtLeast(MINIMUM_FIRMWARE_VERSION) )
+  {
+    error(F("This sketch requires firmware version " MINIMUM_FIRMWARE_VERSION " or higher!"));
+  }
 
   Serial.println("Requesting Bluefruit info:");
   /* Print Bluefruit information */
   ble.info();
 
+  printNVM();
+
   int32_t magic_number;
-  ble.readNVM(0, &magic_number);
+  if( !ble.readNVM(0, &magic_number) ) {
+    error(F("Could not read magic number"));
+  }
 
   if ( magic_number != MAGIC_NUMBER )
   {
@@ -378,7 +410,6 @@ void setup(void) {
 
   setDeviceName(userConfigV1.iconChar);
 
-  // TODO change the bluetooth level settings
   // set the power level: AT+BLEPOWERLEVEL
   if (! ble.atcommand(F("AT+BLEPOWERLEVEL=4"))) {
     error(F("Could not increase power level"));
@@ -401,6 +432,7 @@ void setup(void) {
   // TODO add readable characteristic with a version
   gatt.addService(0x1234);
 
+  // Add icon character characteristic
   // The AT command has the ability to set a default value but this helper function doesn't
   iconCharCharacteristicId = gatt.addCharacteristic(0x2345, GATT_CHARS_PROPERTIES_WRITE | GATT_CHARS_PROPERTIES_READ, 
     1, 5, BLE_DATATYPE_STRING, "identifier char");
@@ -412,6 +444,13 @@ void setup(void) {
   // a conversion so if the iconChar was intended to be 'h', the actual value saved would be '68'
   gatt.setChar(iconCharCharacteristicId, userConfigV1.iconChar);
 
+  // Add version characteristic
+  // The AT command has the ability to set a default value but this helper function doesn't
+  versionCharacteristicId = gatt.addCharacteristic(0x6789, GATT_CHARS_PROPERTIES_READ, 
+    5, 10, BLE_DATATYPE_STRING, "version");
+
+  gatt.setChar(versionCharacteristicId, "1.0.0");
+  
   // add a callback so we get notified when this changes
   addGattRxCallback(iconCharCharacteristicId, BleGattRXId);
 
@@ -439,6 +478,9 @@ void setup(void) {
   Serial.println();
 
   disconnectedCount = 0;
+
+  // Turn off the light now that we've made it through setup
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
 void readTemperature(SensorServiceInfo *sensorService, const __FlashStringHelper*label, int32_t pin, TempCoefficients *coefficients){
@@ -541,8 +583,8 @@ void loop(void) {
   measuredvbat *= 2;    // we divided by 2, so multiply back
   measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
   measuredvbat /= 4096; // convert to voltage in 12bit mode
-  // the voltage should range between 3 and 4.2 (but might go higher)
-  uint8_t percentage = (uint8_t)((measuredvbat - 3.0) / 1.25 * 100);
+  // the voltage should range between 3 and 4.8 (but might go higher)
+  uint8_t percentage = (uint8_t)((measuredvbat - 3.0) / 1.8 * 100);
 
   Serial.print("Update battery level voltage: ");
   Serial.print(measuredvbat);
