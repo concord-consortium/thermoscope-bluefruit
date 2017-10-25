@@ -1,42 +1,25 @@
-A arduino sketch for a Adafruit Bluefruit MO board connected to two thermistors.
+A Arduino sketch for a Adafruit Bluefruit MO board connected to two thermistors.
 
-In addition to some default services provided by the Bluefuit board it provides
-three adtional services.  Two temperature services and one generic device service.
+## Steps to Install
 
-## Temperature Services
+### Download the Arduino IDE.
 
-- f000aa0004514000b000000000000000 - Temperature A
-- f000bb0004514000b000000000000000 - Temperature B
+### Setup the IDE
 
-Each Temperature Service has 5 characteristics. 2 measurements and 3 calibration.
+Details are here:
+https://learn.adafruit.com/adafruit-feather-m0-bluefruit-le/pinouts?view=all#setup
 
-### Measurements
+- Add "Additional Boards Manager URLs": https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
 
-- 0x0001 - temperature Measurement - integer with the temp in C times 100 so 30.01 C is
-  represented as 3001
-- 0x0002 - int microvolts measurement as an integer
+- Install SAMD support
 
-### Calibrations
+- Install Adafruit SAMD Support
 
-- 0x0003 - int value of the series resistor in Ohms default is: 10000
-- 0x0004 - int thermistor nominal resistance in Ohms default is: 10000
-- 0x0005 - int thermistorBeta default is: 3950
+### Add the Bluefruit library from Adafruit:
+https://learn.adafruit.com/adafruit-feather-m0-bluefruit-le/pinouts?view=all#install-the-adafruit-nrf51-ble-library
 
-## Generic Device Service
+## Operation
 
-0x1234 - Info about device
+[GATT Services](docs/gatt-services.md)
 
-This service currently has one characteristic: 0x2345 
-
-It is used to store a uft8 character to identifier the device
-this character is added onto the end of the device name "Thermoscope "
-
-Updating the uft8 character with some BLE exploring apps is tricky. They don't handle
-multi byte characters well. I used LightBlue an app on OS X, to write the characters.
-First I converted the character to its hex bytes using this site: http://www.ltg.ed.ac.uk/~richard/utf-8.cgi
-An example character is this one:
-  http://www.ltg.ed.ac.uk/~richard/utf-8.cgi?input=%F0%9F%9A%80&mode=char
-Then in LightBlue I found the 0x1234 service followed by 0x2345 characteristc and then
-entered the hex value for the character in this case: F09F9A80. Hitting enter in LightBlue
-sends the value to the device.  I'm not sure if LightBlue sends a null character in this
-case, but I think it does not. I think it simply sends the 4 bytes.
+[LED Flash Patterns](docs/led-flash-patterns.md)
