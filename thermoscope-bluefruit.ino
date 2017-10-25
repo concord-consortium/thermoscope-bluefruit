@@ -447,7 +447,7 @@ void setup(void) {
 
   // Add icon character characteristic
   // The AT command has the ability to set a default value but this helper function doesn't
-  iconCharCharacteristicId = gatt.addCharacteristic(0x2345, GATT_CHARS_PROPERTIES_WRITE | GATT_CHARS_PROPERTIES_READ, 
+  iconCharCharacteristicId = gatt.addCharacteristic(0x2345, GATT_CHARS_PROPERTIES_WRITE_WO_RESP | GATT_CHARS_PROPERTIES_READ, 
     1, 5, BLE_DATATYPE_STRING, "identifier char");
   if( iconCharCharacteristicId == 0 ) {
     error(F("Couldn't add icon characteristic"));
