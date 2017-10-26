@@ -20,3 +20,6 @@ re-enable it after it gets setup.
 
 The adafruit library for talking to the module does not handle an error while reading
 the non-volitale memory.
+
+Here is a issue on Adafruit that discusses a similar issue to what we are having:
+https://github.com/adafruit/Adafruit_BluefruitLE_nRF51/issues/35
